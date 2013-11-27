@@ -9,6 +9,19 @@ use POSIX qw(ceil);
 
 use namespace::autoclean;
 
+my %search_operations = (
+    eq => sub { "=" => $_[0] },
+    ne => sub { "!=" => $_[0] },
+    ew => sub { "LIKE" => "%".$_[0] },
+    en => sub { "!=" => { "LIKE" => "%".$_[0] } },
+    bw => sub { "LIKE" => $_[0]."%" },
+    bn => sub { "!=" => { "LIKE" => $_[0]."%" } },
+    cn => sub { "LIKE" => "%".$_[0]."%" },
+    nc => sub { "!=" => { "LIKE" => "%".$_[0]."%" } },
+    in => sub { "IN" => [ split " ", $_[0] ] },
+    ni => sub { "NOT IN" => [ split " ", $_[0] ] },
+);
+
 #
 # page_params:
 #
@@ -17,25 +30,34 @@ use namespace::autoclean;
 sub jqgrid_page {
     my ($self, $c, $result_set) = @_;
 
-    my $config = $c->config->{'Catalyst::TraitFor::Controller::jQuery::jqGrid'};
-    my $page_key = 'page';
-    my $rows_key = 'rows';
-    my $sidx_key = 'sidx';
-    my $sord_key = 'sord';
-    my $json_key = 'json_data';
+    my $config = $self->config->{'Catalyst::TraitFor::Controller::jQuery::jqGrid'};
+    my $page_key = $config->{page_key} || 'page';
+    my $rows_key = $config->{rows_key} || 'rows';
+    my $sidx_key = $config->{sidx_key} || 'sidx';
+    my $sord_key = $config->{sord_key} || 'sord';
+    my $json_key = $config->{json_key} || 'json_data';
+    my $srch_flg = $config->{srch_flg} || '_search';
+    my $srch_fld = $config->{srch_fld} || 'searchField';
+    my $srch_str = $config->{srch_str} || 'searchString';
+    my $srch_opr = $config->{srch_opr} || 'searchOper';
 
-    if ($config) {
-        $page_key = $config->{page_key} || 'page';
-        $rows_key = $config->{rows_key} || 'rows';
-        $sidx_key = $config->{sidx_key} || 'sidx';
-        $sord_key = $config->{sord_key} || 'sord';
-        $json_key = $config->{json_key} || 'json_data';
+    my $page          = $c->req->param($page_key) || 0;
+    my $rows          = $c->req->param($rows_key) || 10;
+    my $index_row     = $c->req->param($sidx_key);
+    my $sort_order    = $c->req->param($sord_key);
+    my $search_flag   = $c->req->param($srch_flg);
+    my $search_field  = $c->req->param($srch_fld);
+    my $search_string = $c->req->param($srch_str);
+    my $search_oper   = $c->req->param($srch_opr);
+
+    if( defined $search_flag && $search_flag eq 'true' &&
+        length($search_field) && length($search_string) &&
+        length($search_oper) && defined $search_operations{$search_oper}
+    ) {
+        $result_set = $result_set->search({
+            $search_field => { $operations{$search_oper}( $search_string ) },
+        });
     }
-
-    my $page        = $c->request->param($page_key) || 0;
-    my $rows        = $c->request->param($rows_key) || 10;
-    my $index_row   = $c->request->param($sidx_key);
-    my $sort_order  = $c->request->param($sord_key);
 
     # get the count of the maximum number of records
     my $records = $result_set->count();
@@ -196,11 +218,11 @@ so.
         sord_key    => 'my _sord',
         sidx_key    => 'my _sidx',
         json_key    => 'json_data',
+        srch_flg    => '_my_search',
+        srch_fld    => 'my_searchField',
+        srch_str    => 'my_searchString',
+        srch_opr    => 'my_searchOper',
     });
-
-Note however that this assumes that all grid controls use the same CGI
-parameter names. If this is not so then this module cannot (as yet) work
-for you.
 
 =head1 SUPPORT
 
