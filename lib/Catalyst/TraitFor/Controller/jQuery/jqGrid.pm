@@ -55,7 +55,7 @@ sub jqgrid_page {
         length($search_oper) && defined $search_operations{$search_oper}
     ) {
         $result_set = $result_set->search({
-            $search_field => { $operations{$search_oper}( $search_string ) },
+            $search_field => { $search_operations{$search_oper}( $search_string ) },
         });
     }
 
